@@ -1,0 +1,21 @@
+# Build output
+build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+compile_commands.json
+
+# Generated database / simulated disk files
+*.bin
+
+# IDE / editor files
+.vscode/
+.idea/
+.DS_Store
+
+# Compiled executables
+*.out
+*.exe
+*.app
