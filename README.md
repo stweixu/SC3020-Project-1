@@ -2,29 +2,6 @@
 
 Database storage and B+ tree indexing project.
 
-## Project Flow
-
-```text
-NBA Dataset
-    │
-    ▼
-Task 1: Storage
-    │
-    ▼
-database.bin
-(simulated disk)
-    │
-    │ record locations
-    ▼
-Task 2: B+ Tree
-    │
-    ▼
-index.bin
-    │
-    ▼
-Task 3: Query / Delete / Benchmark
-```
-
 ## `main.cpp`
 
 `main.cpp` is the entry point of the program. It coordinates the three tasks in order.
@@ -32,7 +9,7 @@ Task 3: Query / Delete / Benchmark
 ```text
 main.cpp
    │
-   ├── Task 1: Load games.txt
+   ├── Task 1: Read games.txt
    │          ↓
    │      create database.bin
    │
@@ -45,18 +22,16 @@ main.cpp
 
 ## Task 1 — Storage
 
-Convert the NBA dataset into:
-
-```text
-Records → Blocks → database.bin
-```
+Create a database.bin binary file (simulating a local disk) that stores NBA datasets in fixed-size blocks
 
 - **Record** = one NBA dataset row
-- **Block** = fixed-size storage unit containing records
-- **database.bin** = binary file used as the simulated disk
-- Storage will provide an API for reading/writing records and blocks from database.bin
+- **Record size** = number of bytes used to store one record
+- **Block** = fixed-size storage unit containing multiple records
+- **Block size** = number of bytes in one block
+- **Records per block** = how many records fit inside one block
+- **database.bin** = binary file containing all blocks
 
-Say a record can be identified by:
+A record will be identified based on (blockId, slotId)
 
 ```text
 (blockId, slotId)
@@ -64,41 +39,29 @@ Say a record can be identified by:
 
 ## Task 2 — B+ Tree
 
-Build a B+ tree using:
+Create a B+ tree using FG_PCT_home as the key.
 
-```text
-FG_PCT_home
-```
+Main operations:
 
-The tree maps keys to record locations:
+- insert
+- search
+- delete
 
-```text
-FG_PCT_home
-     ↓
-  B+ Tree
-     ↓
-(blockId, slotId)
-     ↓
-database.bin
-```
+B+ tree will map a key → (blockId, slotId)
 
-The B+ tree is stored in:
-
-```text
-index.bin
-```
+The B+ tree will be stored in **index.bin** for indexing.
 
 ## Task 3 — Query / Delete / Benchmark
 
-Find records where:
+Perform search and deletion of records where _FG_PCT_home > 0.5_
 
-```text
-FG_PCT_home > 0.5
-```
+Compare the B+ tree approach against a brute-force linear scan via
 
-Then use the B+ tree and storage system to perform the required deletion and measurements.
-
-Also compare the B+ tree approach against a brute-force linear scan.
+1. Index nodes accessed
+2. Data blocks accessed
+3. Number of games deleted
+4. Average FG_PCT_home of returned records
+5. Retrieval running time
 
 ## Project Structure
 
