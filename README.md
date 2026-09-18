@@ -31,11 +31,7 @@ Create a database.bin binary file (simulating a local disk) that stores NBA data
 - **Records per block** = how many records fit inside one block
 - **database.bin** = binary file containing all blocks
 
-A record will be identified based on (blockId, slotId)
-
-```text
-(blockId, slotId)
-```
+A record will be identified by (blockId, slotId).
 
 ## Task 2 — B+ Tree
 
@@ -47,13 +43,13 @@ Main operations:
 - search
 - delete
 
-B+ tree will map a key → (blockId, slotId)
+B+ tree will map _FG_PCT_home_ → _(blockId, slotId)_
 
 The B+ tree will be stored in **index.bin** for indexing.
 
 ## Task 3 — Query / Delete / Benchmark
 
-Perform search and deletion of records where _FG_PCT_home > 0.5_
+Perform search and deletion of records where _FG_PCT_home > 0.5_.
 
 Compare the B+ tree approach against a brute-force linear scan via
 
