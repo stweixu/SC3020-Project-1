@@ -4,26 +4,22 @@
 #include <cstring>
 #include "record.h"
  
-// Size of one disk block (the unit of I/O to the simulated disk file).
-constexpr int BLOCK_SIZE = 4096;
+// Size of one disk block
+constexpr int block_size = 4096;
  
-// Header: block_id (4 bytes) + num_records (4 bytes)
-constexpr int BLOCK_HEADER_SIZE = 2 * sizeof(int32_t);
+// block_id (4 bytes) + num_records (4 bytes)
+constexpr int block_header_size = 2 * sizeof(int);
  
 // Each slot costs one Record plus one byte in the used[] array.
-constexpr int RECORDS_PER_BLOCK =
-    (BLOCK_SIZE - BLOCK_HEADER_SIZE) / (sizeof(Record) + 1);
+constexpr int records_per_block =
+    (block_size - block_header_size) / (sizeof(Record) + 1);
  
 struct Block {
-    // ---- header ----
-    int32_t block_id;                  // position of this block in the file
-    int32_t num_records;               // number of live (non-deleted) records
- 
-    // ---- slot directory ----
-    uint8_t used[RECORDS_PER_BLOCK];   // 1 = slot holds a record, 0 = free/deleted
- 
-    // ---- data ----
-    Record records[RECORDS_PER_BLOCK];
+    int block_id; // position of block
+    int num_records; // number of live records
+
+    bool used[records_per_block]; // 1 = slot holds a record, 0 = free/deleted
+    Record records[records_per_block]; 
  
     void init(int id) {
         block_id = id;
@@ -31,11 +27,12 @@ struct Block {
         std::memset(used, 0, sizeof(used));
     }
  
-    bool isFull() const { return num_records >= RECORDS_PER_BLOCK; }
+    // True if block is full
+    bool isFull() const { return num_records >= records_per_block; }
  
-    // Returns the slot the record was placed in, or -1 if the block is full.
+    // Returns the slot the record was placed in, or -1 if the block is full
     int insert(const Record& r) {
-        for (int i = 0; i < RECORDS_PER_BLOCK; i++) {
+        for (int i = 0; i < records_per_block; i++) {
             if (!used[i]) {
                 records[i] = r;
                 used[i] = 1;
@@ -46,20 +43,19 @@ struct Block {
         return -1;
     }
  
-    // Marks a slot as free (used in Task 3 deletions).
+    // Marks slot as free
     bool remove(int slot) {
-        if (slot < 0 || slot >= RECORDS_PER_BLOCK || !used[slot]) return false;
+        if (slot < 0  slot >= records_per_block  !used[slot]) return false;
         used[slot] = 0;
         num_records--;
         return true;
     }
 };
  
-static_assert(sizeof(Block) <= BLOCK_SIZE, "Block does not fit in BLOCK_SIZE");
+static_assert(sizeof(Block) <= block_size, "Block does not fit in block size");
  
-// Address of a record on disk; this is what the B+ tree leaves will store.
+// Address of a record on disk (B+ tree leaves store RecordPointers)
 struct RecordPointer {
     int32_t block_id;
     int32_t slot;
 };
- 
