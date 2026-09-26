@@ -1,3 +1,31 @@
 #pragma once
-
-// TODO: Define Disk.
+ 
+#include <fstream>
+#include <string>
+#include "block.h"
+ 
+// Simulates a disk using one binary file.
+// Block i is stored at byte offset i * BLOCK_SIZE.
+// All access goes through readBlock / writeBlock, one whole block at a time.
+class Disk {
+public:
+    // create_new = true wipes any existing file; false opens an existing one.
+    Disk(const std::string& path, bool create_new);
+    ~Disk();
+ 
+    int  allocateBlock();                       // returns the id of a new, empty block
+    void writeBlock(const Block& blk);          // writes blk to position blk.block_id
+    void readBlock(int block_id, Block& blk);   // reads block block_id into blk
+ 
+    int       numBlocks()   const { return num_blocks_; }
+    long long blockReads()  const { return reads_; }
+    long long blockWrites() const { return writes_; }
+    void      resetCounters()     { reads_ = writes_ = 0; }
+ 
+private:
+    std::fstream file_;
+    int num_blocks_ = 0;
+    long long reads_ = 0;
+    long long writes_ = 0;
+};
+ 
