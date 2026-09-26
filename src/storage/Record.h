@@ -1,5 +1,5 @@
 #pragma once
-
+ 
 struct Record {
     char game_date[11]; // 11 bytes
     int team_id_home; // 4 bytes
@@ -11,3 +11,4 @@ struct Record {
     int reb_home; // 4 bytes
     bool home_team_wins; // 1 byte
 };
+ 
