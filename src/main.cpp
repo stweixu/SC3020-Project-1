@@ -32,15 +32,7 @@ int main(int argc, char* argv[]) {
         std::printf("%-38s %lld bytes\n", "Database file size:",
                     (long long)s.blocks_used * BLOCK_SIZE);
         std::printf("%-38s %d\n",         "Lines skipped (missing fields):", s.lines_skipped);
- 
-        // Sanity check: read the first block back from disk and show a few records.
-        Block blk;
-        disk.readBlock(0, blk);
-        std::cout << "\nFirst 3 records read back from block 0:\n";
-        for (int i = 0; i < 3 && i < blk.num_records; i++) printRecord(blk.records[i]);
-    } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << "\n";
-        return 1;
+
     }
     return 0;
 }
