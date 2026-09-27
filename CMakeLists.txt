@@ -9,6 +9,7 @@ add_executable(project1
     src/storage/Record.cpp
     src/storage/Block.cpp
     src/storage/Disk.cpp
+    src/storage/Loader.cpp
     src/bplustree/BPlusTree.cpp
     src/bplustree/Node.cpp
     src/task3/Query.cpp
