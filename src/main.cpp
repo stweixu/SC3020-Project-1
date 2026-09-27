@@ -1,10 +1,13 @@
 #include <cstdio>
+#include <cstring>
 #include <iostream>
 #include <string>
-#include "block.h"
-#include "loader.h"
-#include "record.h"
-#include "storage.h"
+
+#include "storage/Loader.h"
+#include "storage/StorageConfig.h"
+#include "storage/Record.h"
+#include "storage/Disk.h"
+#include "storage/Block.h"
  
 static void printRecord(const Record& r) {
     std::printf("  %-10s  team=%d  pts=%d  fg=%.3f  ft=%.3f  fg3=%.3f  ast=%d  reb=%d  win=%d\n",
@@ -35,7 +38,9 @@ int main(int argc, char* argv[]) {
  
         // Sanity check: read the first block back from disk and show a few records.
         Block blk;
-        disk.readBlock(0, blk);
+        char buffer[BLOCK_SIZE];
+        disk.readBlock(0, buffer);
+        std::memcpy(&blk, buffer, sizeof(Block));
         std::cout << "\nFirst 3 records read back from block 0:\n";
         for (int i = 0; i < 3 && i < blk.num_records; i++) printRecord(blk.records[i]);
     } catch (const std::exception& e) {
