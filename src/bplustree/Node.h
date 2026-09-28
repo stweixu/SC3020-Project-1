@@ -4,7 +4,8 @@
 #include "../storage/Block.h"
 
 // Maximum number of keys in a node, N
-constexpr int BPTREE_N = 340;   
+constexpr int BPTREE_N = 340;
+constexpr int32_t INVALID_NODE_ID = -1;
 
 // B+ tree node, which can be internal or leaf
 struct Node {
@@ -33,4 +34,4 @@ struct Node {
     bool isLeaf() const;
 
     bool isFull() const;
-};
+}; 
