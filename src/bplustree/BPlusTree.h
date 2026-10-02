@@ -45,6 +45,7 @@ public:
     // Build / statistics
     std::size_t buildFromData(Disk& data_disk, int data_blocks);
     TreeStats stats() const;
+    bool validate() const;
 
     int32_t rootNodeId() const {
         return ROOT_NODE_ID;

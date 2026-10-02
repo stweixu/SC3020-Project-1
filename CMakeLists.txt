@@ -6,7 +6,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_executable(project1
     src/main.cpp
-    src/storage/Record.cpp
     src/storage/Block.cpp
     src/storage/Disk.cpp
     src/storage/Loader.cpp

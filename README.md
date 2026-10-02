@@ -8,6 +8,7 @@ Database storage and B+ tree indexing project.
 
 ```text
 main.cpp
+
    │
    ├── Task 1: Read games.txt
    │          ↓
@@ -22,7 +23,7 @@ main.cpp
 
 ## Task 1 — Storage
 
-Create a database.bin binary file (simulating a local disk) that stores NBA datasets in fixed-size blocks
+Create a `database.bin` binary file that simulates a local disk and stores the NBA dataset in fixed-size blocks.
 
 - **Record** = one NBA dataset row
 - **Record size** = number of bytes used to store one record
@@ -31,50 +32,216 @@ Create a database.bin binary file (simulating a local disk) that stores NBA data
 - **Records per block** = how many records fit inside one block
 - **database.bin** = binary file containing all blocks
 
-A record will be identified by (blockId, slotId).
+A record is identified by `(blockId, slotId)`.
 
 ## Task 2 — B+ Tree
 
-Create a B+ tree using FG_PCT_home as the key.
+Create a B+ tree using `FG_PCT_home` as the key.
 
 Main operations:
 
-- insert
-- search
-- delete
+- Insert
+- Search
+- Delete
 
-B+ tree will map _FG_PCT_home_ → _(blockId, slotId)_
+The B+ tree maps:
 
-The B+ tree will be stored in **index.bin** for indexing.
+```text
+FG_PCT_home → (blockId, slotId)
+```
+
+The B+ tree is stored in `index.bin`.
 
 ## Task 3 — Query / Delete / Benchmark
 
-Perform search and deletion of records where _FG_PCT_home > 0.5_.
+Perform search and deletion of records where:
 
-Compare the B+ tree approach against a brute-force linear scan via
+```text
+FG_PCT_home > 0.5
+```
 
-1. Index nodes accessed
-2. Data blocks accessed
+The B+ tree approach is compared against a brute-force linear scan using:
+
+1. Number of index nodes accessed
+2. Number of data blocks accessed
 3. Number of games deleted
-4. Average FG_PCT_home of returned records
+4. Average `FG_PCT_home` of returned records
 5. Retrieval running time
+6. Brute-force data blocks accessed
+7. Brute-force running time
+
+The B+ tree is then updated after the deletion.
+
+## Installation / Setup
+
+### Requirements
+
+- C++17 compatible compiler
+- CMake 3.10 or later
+
+### Build
+
+From the project root:
+
+```bash
+mkdir -p build
+cd build
+cmake ..
+make
+```
+
+The executable will be created as:
+
+```text
+build/project1
+```
+
+### Dataset
+
+Place the NBA dataset file in the location expected by the program:
+
+```text
+games.txt
+```
+
+The dataset is used by Task 1 to create the binary database file.
+
+## Running the Program
+
+From the project root:
+
+### Run all tasks
+
+```bash
+./build/project1
+```
+
+This runs:
+
+```text
+Task 1 → Task 2 → Task 3
+```
+
+and generates:
+
+```text
+storage/database.bin
+storage/index.bin
+```
+
+### Run Task 3
+
+```bash
+./build/project1 task3
+```
+
+Optional database and index paths can also be provided:
+
+```bash
+./build/project1 task3 [database_path] [index_path]
+```
+
+Example:
+
+```bash
+./build/project1 task3 storage/database.bin storage/index.bin
+```
+
+### Verify Task 3
+
+```bash
+./build/project1 verify
+```
+
+or:
+
+```bash
+./build/project1 verify storage/database.bin storage/index.bin
+```
+
+The verification checks that no records with `FG_PCT_home > 0.5` remain in either the database or B+ tree.
+
+## Configuration
+
+Important configuration values are defined in the source code.
+
+### B+ Tree Order
+
+The maximum number of keys per B+ tree node is controlled by:
+
+```cpp
+BPTREE_N
+```
+
+in:
+
+```text
+src/bplustree/Node.h
+```
+
+Current value:
+
+```cpp
+BPTREE_N = 340
+```
+
+### Task 3 Threshold
+
+The Task 3 query currently uses:
+
+```text
+FG_PCT_home > 0.5
+```
+
+The threshold can be changed in the Task 3 query configuration if testing with a different condition.
+
+### Storage Configuration
+
+Storage-related parameters such as block size are defined in:
+
+```text
+src/storage/StorageConfig.h
+```
 
 ## Project Structure
 
 ```text
 SC3020-Project1/
-├── data/
+│
+├── CMakeLists.txt
+├── README.md
+├── games.txt
+│
 ├── src/
+│   ├── main.cpp
+│   │
 │   ├── storage/
+│   │   ├── Record.h
+│   │   ├── Block.h
+│   │   ├── Block.cpp
+│   │   ├── Disk.h
+│   │   ├── Disk.cpp
+│   │   ├── Loader.h
+│   │   ├── Loader.cpp
+│   │   └── StorageConfig.h
+│   │
 │   ├── bplustree/
-│   ├── task3/
-│   └── main.cpp
+│   │   ├── Node.h
+│   │   ├── Node.cpp
+│   │   ├── BPlusTree.h
+│   │   └── BPlusTree.cpp
+│   │
+│   └── task3/
+│       ├── Query.h
+│       ├── Query.cpp
+│       ├── Benchmark.h
+│       └── Benchmark.cpp
+│
 ├── storage/
 │   ├── database.bin
 │   └── index.bin
-├── CMakeLists.txt
-├── README.md
-└── .gitignore
+│
+└── build/
 ```
 
-`database.bin` and `index.bin` are generated at runtime by the program.
+`database.bin` and `index.bin` are generated at runtime and do not need to be included as source files.

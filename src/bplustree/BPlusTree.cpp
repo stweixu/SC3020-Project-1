@@ -6,6 +6,7 @@
 #include <cstring>
 #include <stdexcept>
 #include <utility>
+#include <iostream>
 
 namespace {
 
@@ -455,4 +456,53 @@ TreeStats BPlusTree::stats() const {
         }
     }
     return result;
+}
+
+bool BPlusTree::validate() const {
+    Node root = readNode(ROOT_NODE_ID);
+
+    std::vector<int32_t> current_level;
+    current_level.push_back(ROOT_NODE_ID);
+
+    int expected_level = 0;
+
+    while (!current_level.empty()) {
+        std::vector<int32_t> next_level;
+
+        for (int32_t node_id : current_level) {
+            Node node = readNode(node_id);
+
+            if (node.num_keys < 0 || node.num_keys > BPTREE_N) {
+                std::cout << "Invalid key count in node "
+                          << node_id << "\n";
+                return false;
+            }
+
+            for (int i = 1; i < node.num_keys; ++i) {
+                if (node.keys[i - 1] > node.keys[i]) {
+                    std::cout << "Unsorted keys in node "
+                              << node_id << "\n";
+                    return false;
+                }
+            }
+
+            if (!node.isLeaf()) {
+                for (int i = 0; i <= node.num_keys; ++i) {
+                    if (node.child_node_ids[i] == INVALID_NODE_ID) {
+                        std::cout << "Invalid child pointer in node "
+                                  << node_id << "\n";
+                        return false;
+                    }
+
+                    next_level.push_back(node.child_node_ids[i]);
+                }
+            }
+        }
+
+        current_level = next_level;
+        ++expected_level;
+    }
+
+    std::cout << "B+ tree structural validation: PASSED\n";
+    return true;
 }
