@@ -51,6 +51,11 @@ Node BPlusTree::readNode(int32_t id) const {
     if (id < 0 || id >= disk_.numBlocks()) {
         throw std::runtime_error("Invalid index node reference");
     }
+
+    if (measuring_query_) {
+        ++query_node_accesses_;
+    }
+
     std::array<char, BLOCK_SIZE> buffer{};
     disk_.readBlock(id, buffer.data());
     Node node{};
@@ -217,11 +222,14 @@ std::vector<RecordPointer> BPlusTree::search(float key) const {
 }
 
 std::vector<RecordPointer> BPlusTree::rangeSearch(float lower, float upper,
-                                               bool include_lower,
-                                               bool include_upper) const {
+                                                   bool include_lower,
+                                                   bool include_upper) const {
     if (std::isnan(lower) || std::isnan(upper)) {
         throw std::invalid_argument("Range bounds cannot be NaN");
     }
+
+    query_node_accesses_ = 0;
+    measuring_query_ = true;
     std::vector<RecordPointer> result;
     if (lower > upper || (lower == upper && (!include_lower || !include_upper))) {
         return result;
@@ -231,12 +239,18 @@ std::vector<RecordPointer> BPlusTree::rangeSearch(float lower, float upper,
     while (true) {
         for (int i = position; i < leaf.num_keys; ++i) {
             float key = leaf.keys[i];
-            if (key > upper || (!include_upper && key == upper)) return result;
+            if (key > upper || (!include_upper && key == upper)) {
+                measuring_query_ = false;
+                return result;
+            }
             if (key > lower || (include_lower && key == lower)) {
                 result.push_back(leaf.record_pointers[i]);
             }
         }
-        if (leaf.next_leaf == INVALID_NODE_ID) return result;
+        if (leaf.next_leaf == INVALID_NODE_ID) {
+            measuring_query_ = false;
+            return result;
+        }
         leaf = readNode(leaf.next_leaf);
         position = 0;
     }
@@ -249,6 +263,15 @@ float BPlusTree::minimumKey(const Node& node) const {
         throw std::runtime_error("Empty non-root subtree");
     }
     return current.keys[0];
+}
+
+std::size_t BPlusTree::lastQueryNodeAccesses() const {
+    return query_node_accesses_;
+}
+
+void BPlusTree::resetQueryNodeAccesses() const {
+    query_node_accesses_ = 0;
+    measuring_query_ = false;
 }
 
 void BPlusTree::removeChild(Node& parent, int separator_index) {
