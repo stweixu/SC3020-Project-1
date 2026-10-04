@@ -106,7 +106,8 @@ LoadStats loadData(const std::string& data_path, Disk& disk) {
     }
     if (blk.num_records > 0) writeDataBlock(disk, blk);   // last, partially filled block
  
-    stats.blocks_used = disk.numBlocks();
+    // Data blocks are numbered 0 to blk.block_id, so count them directly
+    stats.blocks_used = (stats.records_loaded > 0) ? blk.block_id + 1 : 0;
     return stats;
 }
  
