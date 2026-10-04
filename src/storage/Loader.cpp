@@ -30,7 +30,7 @@ static std::vector<std::string> split(const std::string& line, char delim) {
     std::string field;
     std::stringstream ss(line);
     while (std::getline(ss, field, delim)) fields.push_back(field);
-    if (!line.empty() && line.back() == delim) fields.push_back("");  // trailing empty field
+    if (!line.empty() && line.back() == delim) fields.push_back(""); // trailing empty field
     return fields;
 }
  
@@ -52,7 +52,7 @@ static bool toFloat(const std::string& s, float& out) {
  
 bool parseLine(const std::string& raw, Record& r) {
     std::string line = raw;
-    if (!line.empty() && line.back() == '\r') line.pop_back();   // Windows line endings
+    if (!line.empty() && line.back() == '\r') line.pop_back(); // Windows line endings
  
     std::vector<std::string> f = split(line, '\t');
     if (f.size() < 9) return false;
@@ -83,7 +83,7 @@ LoadStats loadData(const std::string& data_path, Disk& disk) {
  
     LoadStats stats;
     std::string line;
-    std::getline(in, line);                 // skip the header line
+    std::getline(in, line); // skip the header line
  
     Block blk;
     blk.init(0);
@@ -97,14 +97,14 @@ LoadStats loadData(const std::string& data_path, Disk& disk) {
             std::cout << "SKIPPED: " << line << '\n';
             continue; }
  
-        if (blk.isFull()) {                 // current block full: flush it, start the next
+        if (blk.isFull()) { // current block full: flush it, start the next
             writeDataBlock(disk, blk);
             blk.init(blk.block_id + 1);
         }
         blk.insert(r);
         stats.records_loaded++;
     }
-    if (blk.num_records > 0) writeDataBlock(disk, blk);   // last, partially filled block
+    if (blk.num_records > 0) writeDataBlock(disk, blk); // last, partially filled block
  
     // Data blocks are numbered 0 to blk.block_id, so count them directly
     stats.blocks_used = (stats.records_loaded > 0) ? blk.block_id + 1 : 0;
