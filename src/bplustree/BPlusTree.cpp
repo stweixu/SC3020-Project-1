@@ -6,6 +6,7 @@
 #include <cstring>
 #include <stdexcept>
 #include <utility>
+#include <iostream>
 
 namespace {
 
@@ -156,11 +157,14 @@ std::vector<RecordPointer> BPlusTree::search(float key) const {
 }
 
 std::vector<RecordPointer> BPlusTree::rangeSearch(float lower, float upper,
-                                               bool include_lower,
-                                               bool include_upper) const {
+                                                   bool include_lower,
+                                                   bool include_upper) const {
     if (std::isnan(lower) || std::isnan(upper)) {
         throw std::invalid_argument("Range bounds cannot be NaN");
     }
+
+    query_node_accesses_ = 0;
+    measuring_query_ = true;
     std::vector<RecordPointer> result;
     if (lower > upper || (lower == upper && (!include_lower || !include_upper))) {
         return result;
@@ -170,12 +174,18 @@ std::vector<RecordPointer> BPlusTree::rangeSearch(float lower, float upper,
     while (true) {
         for (int i = position; i < leaf.num_keys; ++i) {
             float key = leaf.keys[i];
-            if (key > upper || (!include_upper && key == upper)) return result;
+            if (key > upper || (!include_upper && key == upper)) {
+                measuring_query_ = false;
+                return result;
+            }
             if (key > lower || (include_lower && key == lower)) {
                 result.push_back(leaf.record_pointers[i]);
             }
         }
-        if (leaf.next_leaf == INVALID_NODE_ID) return result;
+        if (leaf.next_leaf == INVALID_NODE_ID) {
+            measuring_query_ = false;
+            return result;
+        }
         leaf = readNode(leaf.next_leaf);
         position = 0;
     }
@@ -432,4 +442,221 @@ void BPlusTree::removeChild(Node& parent, int separator_index) {
         parent.child_node_ids[i] = parent.child_node_ids[i + 1];
     }
     --parent.num_keys;
+}
+
+Node BPlusTree::readNode(int32_t id) const {
+    if (id < 0 || id >= disk_.numBlocks()) {
+        throw std::runtime_error("Invalid index node reference");
+    }
+    std::array<char, BLOCK_SIZE> buffer{};
+    disk_.readBlock(id, buffer.data());
+    Node node{};
+    std::memcpy(&node, buffer.data(), sizeof(node));
+    if (node.node_id != id || node.num_keys < 0 || node.num_keys > BPTREE_N ||
+        (node.is_leaf != 0 && node.is_leaf != 1)) {
+        throw std::runtime_error("Invalid index node header");
+    }
+    return node;
+}
+
+void BPlusTree::writeNode(const Node& node) {
+    std::array<char, BLOCK_SIZE> buffer{};
+    std::memcpy(buffer.data(), &node, sizeof(node));
+    disk_.writeBlock(node.node_id, buffer.data());
+}
+
+// Appends new empty disk blocks
+Node BPlusTree::allocateNode(bool leaf) {
+    int32_t id = disk_.allocateBlock();
+    Node node{};
+    node.init(id, leaf);
+    return node;
+}
+
+Node BPlusTree::findLeaf(float key, bool insert_position,
+                        std::vector<PathEntry>* path) const {
+    Node node = readNode(ROOT_NODE_ID);
+
+    // Search can start in a leaf before the actual first match to avoid skipping duplicates
+    while (!node.isLeaf()) {
+        int child = insert_position ? upperBound(node, key) : lowerBound(node, key);
+        if (path != nullptr) path->push_back({node.node_id, child});
+        node = readNode(node.child_node_ids[child]);
+    }
+    return node;
+}
+
+bool BPlusTree::advanceLeaf(Node& leaf, std::vector<PathEntry>& path) const {
+    while (!path.empty()) {
+        PathEntry& entry = path.back();
+        Node parent = readNode(entry.node_id);
+        if (entry.child_index < parent.num_keys) {
+            ++entry.child_index;
+            Node node = readNode(parent.child_node_ids[entry.child_index]);
+            while (!node.isLeaf()) {
+                path.push_back({node.node_id, 0});
+                node = readNode(node.child_node_ids[0]);
+            }
+            leaf = node;
+            return true;
+        }
+        path.pop_back();
+    }
+    return false;
+}
+
+float BPlusTree::minimumKey(const Node& node) const {
+    Node current = node;
+    while (!current.isLeaf()) current = readNode(current.child_node_ids[0]);
+    if (current.num_keys == 0) {
+        throw std::runtime_error("Empty non-root subtree");
+    }
+    return current.keys[0];
+}
+
+void BPlusTree::rebalanceChild(Node& parent, int child_index) {
+    Node child = readNode(parent.child_node_ids[child_index]);
+    if (child_index > 0) parent.keys[child_index - 1] = minimumKey(child);
+    if (child.num_keys >= minimumKeys(child)) return; // Check for occupancy
+
+    if (child_index > 0) {
+        Node left = readNode(parent.child_node_ids[child_index - 1]);
+        if (left.num_keys > minimumKeys(left)) { // Try borrowing from left sibling
+            for (int i = child.num_keys; i > 0; --i) child.keys[i] = child.keys[i - 1];
+            if (child.isLeaf()) {
+                for (int i = child.num_keys; i > 0; --i) {
+                    child.record_pointers[i] = child.record_pointers[i - 1];
+                }
+                child.keys[0] = left.keys[left.num_keys - 1];
+                child.record_pointers[0] = left.record_pointers[left.num_keys - 1];
+                parent.keys[child_index - 1] = child.keys[0];
+            } else {
+                for (int i = child.num_keys + 1; i > 0; --i) {
+                    child.child_node_ids[i] = child.child_node_ids[i - 1];
+                }
+                child.keys[0] = parent.keys[child_index - 1];
+                child.child_node_ids[0] = left.child_node_ids[left.num_keys];
+                parent.keys[child_index - 1] = left.keys[left.num_keys - 1];
+            }
+            --left.num_keys;
+            ++child.num_keys;
+            writeNode(left);
+            writeNode(child);
+            return;
+        }
+    }
+
+    if (child_index < parent.num_keys) {
+        Node right = readNode(parent.child_node_ids[child_index + 1]);
+        if (right.num_keys > minimumKeys(right)) { // Try borrowing from right sibling
+            if (child.isLeaf()) {
+                child.keys[child.num_keys] = right.keys[0];
+                child.record_pointers[child.num_keys] = right.record_pointers[0];
+                for (int i = 0; i < right.num_keys - 1; ++i) {
+                    right.record_pointers[i] = right.record_pointers[i + 1];
+                }
+                parent.keys[child_index] = right.keys[1];
+            } else {
+                child.keys[child.num_keys] = parent.keys[child_index];
+                child.child_node_ids[child.num_keys + 1] = right.child_node_ids[0];
+                parent.keys[child_index] = right.keys[0];
+                for (int i = 0; i < right.num_keys; ++i) {
+                    right.child_node_ids[i] = right.child_node_ids[i + 1];
+                }
+            }
+            for (int i = 0; i < right.num_keys - 1; ++i) right.keys[i] = right.keys[i + 1];
+            --right.num_keys;
+            ++child.num_keys;
+            writeNode(right);
+            writeNode(child);
+            return;
+        }
+    }
+
+    if (child_index > 0) {
+        Node left = readNode(parent.child_node_ids[child_index - 1]);
+        mergeNodes(left, child, parent.keys[child_index - 1]);
+        removeChild(parent, child_index - 1);
+    } else {
+        Node right = readNode(parent.child_node_ids[1]);
+        mergeNodes(child, right, parent.keys[0]);
+        removeChild(parent, 0);
+    }
+}
+
+// Appends right leaf's entries to left leaf, then bypasses right leaf
+void BPlusTree::mergeNodes(Node& left, const Node& right, float separator) {
+    int offset = left.num_keys;
+    if (left.isLeaf()) {
+        std::copy_n(right.keys, right.num_keys, left.keys + offset);
+        std::copy_n(right.record_pointers, right.num_keys, left.record_pointers + offset);
+        left.num_keys += right.num_keys;
+        left.next_leaf = right.next_leaf;
+    } else {
+        left.keys[offset] = separator;
+        std::copy_n(right.keys, right.num_keys, left.keys + offset + 1);
+        std::copy_n(right.child_node_ids, right.num_keys + 1,
+                    left.child_node_ids + offset + 1);
+        left.num_keys += right.num_keys + 1;
+    }
+    writeNode(left);
+}
+
+void BPlusTree::removeChild(Node& parent, int separator_index) {
+    for (int i = separator_index; i < parent.num_keys - 1; ++i) {
+        parent.keys[i] = parent.keys[i + 1];
+    }
+    for (int i = separator_index + 1; i < parent.num_keys; ++i) {
+        parent.child_node_ids[i] = parent.child_node_ids[i + 1];
+    }
+    --parent.num_keys;
+}
+
+bool BPlusTree::validate() const {
+    Node root = readNode(ROOT_NODE_ID);
+
+    std::vector<int32_t> current_level;
+    current_level.push_back(ROOT_NODE_ID);
+
+    int expected_level = 0;
+
+    while (!current_level.empty()) {
+        std::vector<int32_t> next_level;
+
+        for (int32_t node_id : current_level) {
+            Node node = readNode(node_id);
+
+            if (node.num_keys < 0 || node.num_keys > BPTREE_N) {
+                std::cout << "Invalid key count in node "
+                          << node_id << "\n";
+                return false;
+            }
+
+            for (int i = 1; i < node.num_keys; ++i) {
+                if (node.keys[i - 1] > node.keys[i]) {
+                    std::cout << "Unsorted keys in node "
+                              << node_id << "\n";
+                    return false;
+                }
+            }
+
+            if (!node.isLeaf()) {
+                for (int i = 0; i <= node.num_keys; ++i) {
+                    if (node.child_node_ids[i] == INVALID_NODE_ID) {
+                        std::cout << "Invalid child pointer in node "
+                                  << node_id << "\n";
+                        return false;
+                    }
+
+                    next_level.push_back(node.child_node_ids[i]);
+                }
+            }
+        }
+
+        current_level = next_level;
+        ++expected_level;
+    }
+
+    std::cout << "B+ tree structural validation: PASSED\n";
+    return true;
 }
