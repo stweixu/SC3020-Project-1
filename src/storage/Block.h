@@ -48,6 +48,6 @@ static_assert(sizeof(Block) <= BLOCK_SIZE, "Block does not fit in block size");
  
 // Address of a record on disk (B+ tree leaves store RecordPointers)
 struct RecordPointer {
-    int32_t block_id;
-    int32_t slot;
+    int block_id;
+    int slot;
 };
