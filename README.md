@@ -72,7 +72,7 @@ The B+ tree approach is compared against a brute-force linear scan using:
 
 The B+ tree is then updated after the deletion.
 
-## Installation / Setup
+## Installation guide
 
 ### Requirements
 
